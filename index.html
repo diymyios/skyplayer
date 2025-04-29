@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>YouTube Video Player with Play/Pause and Close Button</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background-color: #000;
+      flex-direction: column;
+    }
+
+    #player-container {
+      margin: 0;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    iframe {
+      width: 100%;
+      height: 100%;
+      max-height: 99vh;
+      border: none;
+      pointer-events: none;
+    }
+
+    #time-display {
+      position: absolute;
+      top: 0px;
+      left: 5px;
+      color: white;
+      font-size: 18px;
+      z-index: 1;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 5px 10px;
+      border-radius: 5px;
+    }
+
+    .controls {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+    }
+
+    .controls.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .btn {
+      padding: 5px 10px;
+      background-color: #f5f5f5;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      margin: 0 10px;
+    }
+
+    .btn:hover {
+      background-color: #ddd;
+    }
+
+    #progress-bar {
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    .circle-btn {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background-color: #f5f5f5;
+      border: none;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      font-size: 24px;
+      z-index: 2;
+    }
+
+    .circle-btn:hover {
+      background-color: #ddd;
+    }
+
+    @media (max-width: 600px) {
+      #player-container {
+        margin-top: -30px;
+        height: 100vh;
+        width: 100vw;
+      }
+
+      #time-display {
+        top: 0px;
+        left: 5px;
+      }
+
+      .controls {
+        bottom: 5px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 2;
+      }
+
+      .btn {
+        padding: 8px 10px;
+        font-size: 14px;
+      }
+
+      .circle-btn {
+        bottom: 10px;
+        right: 10px;
+        width: 40px;
+        height: 40px;
+        font-size: 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="time-display">0:00 / 0:00</div>
+
+  <div id="player-container">
+    <iframe id="youtube-player"
+      src=""
+      allow="autoplay; fullscreen; encrypted-media"
+      allowfullscreen
+      title="YouTube video player">
+    </iframe>
+  </div>
+
+  <div class="controls">
+    <div>
+      <button class="btn" id="play-btn">Play</button>
+      <button class="btn" id="pause-btn">Pause</button>
+      <button class="btn" id="close-btn">Close</button>
+      <button class="btn" id="rewind-btn"><<</button>
+      <button class="btn" id="forward-btn">>></button>
+    </div>
+    <input type="range" id="progress-bar" value="0" max="100" step="1">
+  </div>
+
+  <button class="circle-btn" id="toggle-controls-btn">&#x2630;</button>
+
+  <script>
+    // Get idvideo from URL
+    function getVideoIdFromURL() {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get('idvideo');
+    }
+
+    // Set iframe source
+    const videoId = getVideoIdFromURL();
+    if (videoId) {
+      const iframe = document.getElementById('youtube-player');
+      iframe.src = `https://www.youtube.com/embed/${videoId}?enablejsapi=1&autoplay=1&modestbranding=1&rel=0&fs=1&controls=0`;
+    } else {
+      alert("Video ID not specified in the URL.");
+    }
+
+    // Load YouTube API
+    var tag = document.createElement('script');
+    tag.src = "https://www.youtube.com/iframe_api";
+    var firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+    var player;
+    var controlsTimeout;
+
+    function onYouTubeIframeAPIReady() {
+      player = new YT.Player('youtube-player', {
+        events: {
+          'onReady': onPlayerReady,
+          'onStateChange': onPlayerStateChange
+        }
+      });
+    }
+
+    function onPlayerReady(event) {
+      document.getElementById('play-btn').addEventListener('click', function() {
+        player.playVideo();
+        showControls();
+      });
+
+      document.getElementById('pause-btn').addEventListener('click', function() {
+        player.pauseVideo();
+        showControls();
+      });
+
+      document.getElementById('close-btn').addEventListener('click', function() {
+        window.history.back();
+      });
+
+      document.getElementById('rewind-btn').addEventListener('click', function() {
+        var currentTime = player.getCurrentTime();
+        player.seekTo(currentTime - 10, true);
+        showControls();
+      });
+
+      document.getElementById('forward-btn').addEventListener('click', function() {
+        var currentTime = player.getCurrentTime();
+        player.seekTo(currentTime + 10, true);
+        showControls();
+      });
+
+      document.getElementById('progress-bar').addEventListener('input', function() {
+        var newTime = (this.value / 100) * player.getDuration();
+        player.seekTo(newTime, true);
+        showControls();
+      });
+
+      setInterval(function() {
+        var currentTime = player.getCurrentTime();
+        var duration = player.getDuration();
+        var progress = (currentTime / duration) * 100;
+        document.getElementById('progress-bar').value = progress;
+
+        document.getElementById('time-display').textContent =
+          formatTime(currentTime) + ' / ' + formatTime(duration);
+      }, 1000);
+
+      resetControlsTimeout();
+      document.getElementById('time-display').addEventListener('click', resetControlsTimeout);
+    }
+
+    function onPlayerStateChange(event) {
+      // Add future handling if needed
+    }
+
+    function formatTime(seconds) {
+      var hours = Math.floor(seconds / 3600);
+      var minutes = Math.floor((seconds % 3600) / 60);
+      var remainingSeconds = Math.floor(seconds % 60);
+
+      if (hours > 0) {
+        return hours + ':' + padZero(minutes) + ':' + padZero(remainingSeconds);
+      } else {
+        return minutes + ':' + padZero(remainingSeconds);
+      }
+    }
+
+    function padZero(num) {
+      return num < 10 ? '0' + num : num;
+    }
+
+    function showControls() {
+      document.querySelector('.controls').classList.remove('hidden');
+      document.getElementById('toggle-controls-btn').style.display = 'none';
+      resetControlsTimeout();
+    }
+
+    function hideControls() {
+      document.querySelector('.controls').classList.add('hidden');
+      document.getElementById('toggle-controls-btn').style.display = 'block';
+    }
+
+    function resetControlsTimeout() {
+      clearTimeout(controlsTimeout);
+      controlsTimeout = setTimeout(hideControls, 5000);
+    }
+
+    document.getElementById('toggle-controls-btn').addEventListener('click', function() {
+      if (document.querySelector('.controls').classList.contains('hidden')) {
+        showControls();
+      } else {
+        hideControls();
+      }
+    });
+  </script>
+</body>
+</html>
